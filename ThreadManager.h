@@ -31,7 +31,7 @@ private:
     
     std::queue<int> ready_queue;
     
-    // min heap to find next available id
+    // min heap to find next available id(which is the smallest)
     std::priority_queue<int, std::vector<int>, std::greater<int>> available_ids;
 
     int quantum_usecs; //time of a single quantum
@@ -47,6 +47,7 @@ public:
     ThreadManager(const ThreadManager&) = delete;
     ThreadManager& operator=(const ThreadManager&) = delete;
     void init_main_thread();
+    int get_running_thread_id() const;
     
 };
 

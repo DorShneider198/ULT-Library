@@ -35,12 +35,12 @@ void ThreadManager::init_main_thread() {
     main_thread->state = RUNNING;
     main_thread->quantums_run = 1;
     main_thread->sleep_quantums_left = 0;
-    
     //no need to allocated stack for main thread in ex instructions
     main_thread->stack = nullptr; 
-    
     threads[0] = main_thread;
-    
     running_thread_id = 0;
     total_quantums++;
+}
+int ThreadManager::get_running_thread_id() const {
+    return running_thread_id;
 }

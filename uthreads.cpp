@@ -1,8 +1,10 @@
 #include "uthreads.h"
-
+#include "ThreadManager.h"
 #include <iostream>
 
 
+//creating a single manager object
+static ThreadManager* manager = nullptr;
 /**
  * @brief initializes the thread library.
  *
@@ -16,8 +18,18 @@
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_init(int quantum_usecs) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (quantum_usecs <= 0) {
+        std::cerr << "thread library error: " << "Illegal quantum length" << std::endl;
+        return -1;
+    }
+    // Check if it was already initialized
+    if (manager != nullptr) {
+        std::cerr << "thread library error: Library already initialized" << std::endl;
+        return -1;
+    }
+    manager = new ThreadManager(quantum_usecs);
+    manager->init_main_thread();
+    return 0;
 }
 
 /**
@@ -111,10 +123,12 @@ int uthread_sleep(int num_quantums) {
  * @return The ID of the calling thread.
 */
 int uthread_get_tid() {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }
+    return manager->get_running_thread_id();
 }
-
 
 /**
  * @brief Returns the total number of quantums since the library was initialized, including the current quantum.
