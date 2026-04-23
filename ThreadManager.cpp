@@ -79,5 +79,20 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     new_thread->stack = new char[STACK_SIZE];
 
     //setup Context:
+    //note to myself: address_t is just a convinient type to work with memory
     address_t sp = (address_t)new_thread->stack + STACK_SIZE - sizeof(address_t);
+    //entry_point is the value of the Program Counter from which the created thread begins its code?
+    address_t pc = (address_t)entry_point;
+    //create a "snapshot" of CPU registers and store it in env
+    sigsetjmp(new_thread->env, 1);
+    //override garbage values with the actual thread's relevant data.
+    (new_thread->env->__jmpbuf)[JB_SP] = translate_address(sp);
+    (new_thread->env->__jmpbuf)[JB_PC] = translate_address(pc);
+    
+    //reset state of signals
+    sigemptyset(&new_thread->env->__saved_mask);
+
+    threads[new_id] = new_thread;
+    ready_queue.push(new_id);
+    return new_id;
 }

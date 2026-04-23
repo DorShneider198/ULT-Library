@@ -18,8 +18,9 @@ struct TCB {
     ThreadState state;
     int quantums_run;  //how many times thread was selected by scheduler 
     int sleep_quantums_left; 
-    char* stack;             
-    sigjmp_buf env;          //saving registers and PC for context switch
+    char* stack;   
+    //env is a field to store CPU registers status such as PC,SP
+    sigjmp_buf env;
 };
 /**
  * Threads will be managed in an array(and not unordered map since the thread's number is bounded)
