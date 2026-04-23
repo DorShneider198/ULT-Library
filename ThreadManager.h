@@ -48,6 +48,7 @@ public:
     ThreadManager& operator=(const ThreadManager&) = delete;
     void init_main_thread();
     int get_running_thread_id() const;
+    int spawn_thread(thread_entry_point entry_point);
     
 };
 

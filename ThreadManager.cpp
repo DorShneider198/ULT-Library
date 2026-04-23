@@ -1,5 +1,17 @@
 #include "ThreadManager.h"
 #include <iostream>
+typedef unsigned int address_t;
+#define JB_SP 4
+#define JB_PC 5
+address_t translate_address(address_t addr)
+{
+    address_t ret;
+    asm volatile("xor    %%gs:0x18,%0\n"
+                 "rol    $0x9,%0\n"
+    : "=g" (ret)
+    : "0" (addr));
+    return ret;
+}
 
 ThreadManager::ThreadManager(int quantum_usecs) 
     : quantum_usecs(quantum_usecs), total_quantums(0), running_thread_id(-1) 
@@ -43,4 +55,29 @@ void ThreadManager::init_main_thread() {
 }
 int ThreadManager::get_running_thread_id() const {
     return running_thread_id;
+}
+
+int ThreadManager::spawn_thread(thread_entry_point entry_point) {
+    if (entry_point == nullptr) {
+        std::cerr << "thread library error: entry_point cannot be null" << std::endl;
+        return -1;
+    }
+    
+    if (available_ids.empty()) {
+        std::cerr << "thread library error: reached maximum number of threads" << std::endl;
+        return -1;
+    }
+    //available id implemented as min heap,newly spawn thread get min free id.
+    int new_id = available_ids.top();
+    available_ids.pop();
+    //allocate thread struct fields.
+    TCB* new_thread = new TCB();
+    new_thread->id = new_id;
+    new_thread->state = READY;
+    new_thread->quantums_run = 0;
+    new_thread->sleep_quantums_left = 0;
+    new_thread->stack = new char[STACK_SIZE];
+
+    //setup Context:
+    address_t sp = (address_t)new_thread->stack + STACK_SIZE - sizeof(address_t);
 }

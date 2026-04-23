@@ -1,10 +1,9 @@
 #include "uthreads.h"
 #include "ThreadManager.h"
 #include <iostream>
-
-
 //creating a single manager object
 static ThreadManager* manager = nullptr;
+
 /**
  * @brief initializes the thread library.
  *
@@ -45,9 +44,13 @@ int uthread_init(int quantum_usecs) {
  * @return On success, return the ID of the created thread. On failure, return -1.
 */
 int uthread_spawn(thread_entry_point entry_point) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) {
+            std::cerr << "thread library error: Library not initialized" << std::endl;
+            return -1;
+    }
+    return manager->spawn_thread(entry_point);
 }
+
 
 
 /**
