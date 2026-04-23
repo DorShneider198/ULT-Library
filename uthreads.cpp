@@ -64,8 +64,16 @@ int uthread_spawn(thread_entry_point entry_point) {
  * itself or the main thread is terminated, the function does not return.
 */
 int uthread_terminate(int tid){
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) return -1;
+    if (tid == 0) {
+        delete manager; 
+        exit(0);
+    }
+    // בדיקה אם התהליכון מנסה להרוג את עצמו (נממש scheduling בהמשך)
+    if (tid == manager->get_running_thread_id()) {
+        // כאן נצטרך לקרוא למתזמן (לשיעור הבא)
+    }
+    return manager->terminate_thread(tid);
 }
 
 

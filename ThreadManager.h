@@ -6,6 +6,8 @@
 #include <vector>
 #include <setjmp.h>
 #include <signal.h>
+#include <list> 
+
 
 enum ThreadState {
     RUNNING,
@@ -30,7 +32,7 @@ class ThreadManager {
 private:
     TCB* threads[MAX_THREAD_NUM];
     
-    std::queue<int> ready_queue;
+    std::list<int> ready_queue;
     
     // min heap to find next available id(which is the smallest)
     std::priority_queue<int, std::vector<int>, std::greater<int>> available_ids;
@@ -50,6 +52,7 @@ public:
     void init_main_thread();
     int get_running_thread_id() const;
     int spawn_thread(thread_entry_point entry_point);
+    int terminate_thread(int tid);
     
 };
 

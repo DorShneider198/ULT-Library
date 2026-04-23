@@ -1,8 +1,8 @@
 #include "ThreadManager.h"
 #include <iostream>
-typedef unsigned int address_t;
-#define JB_SP 4
-#define JB_PC 5
+typedef unsigned long address_t;
+#define JB_SP 6
+#define JB_PC 7
 address_t translate_address(address_t addr)
 {
     address_t ret;
@@ -42,6 +42,7 @@ ThreadManager::~ThreadManager() {
 
 //init main theread
 void ThreadManager::init_main_thread() {
+
     TCB* main_thread = new TCB();
     main_thread->id = 0;
     main_thread->state = RUNNING;
@@ -56,6 +57,7 @@ void ThreadManager::init_main_thread() {
 int ThreadManager::get_running_thread_id() const {
     return running_thread_id;
 }
+
 
 int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     if (entry_point == nullptr) {
@@ -93,6 +95,33 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     sigemptyset(&new_thread->env->__saved_mask);
 
     threads[new_id] = new_thread;
-    ready_queue.push(new_id);
+    ready_queue.push_back(new_id);
     return new_id;
+}
+
+//this function has 2 steps: realease the memory and return the id to the free id heap
+int ThreadManager::terminate_thread(int tid) {
+    if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
+        return -1;
+    }
+
+    if(tid == 0) {
+        return 0;
+    }
+    //removing thread from the running ready queue
+    ready_queue.remove(tid);
+    //free memory
+
+    if (threads[tid]->stack != nullptr) {
+        delete[] threads[tid]->stack;
+    }
+    delete threads[tid];
+    threads[tid] = nullptr;
+
+    //recycyle id bak to vavilavbes
+    available_ids.push(tid);
+
+    return 0;
+
 }
