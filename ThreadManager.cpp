@@ -146,9 +146,10 @@ void ThreadManager::context_switch() {
 
     if (ret_val == 0) {
 
-        threads[current_tid]->state = READY;
-        ready_queue.push_back(current_tid);
-        
+        if (threads[current_tid]->state == RUNNING) {
+            threads[current_tid]->state = READY;
+            ready_queue.push_back(current_tid);
+        }        
         int next_tid = ready_queue.front();
         ready_queue.pop_front();
         
@@ -160,4 +161,62 @@ void ThreadManager::context_switch() {
         //tell CPU to jump to "snapshot" of the next thread
         siglongjmp(threads[next_tid]->env, 1);
     }  
+}
+void ThreadManager::terminate_current_and_switch() {
+    int tid = running_thread_id;
+    
+    if (threads[tid]->stack != nullptr) {
+        delete[] threads[tid]->stack;
+    }
+    delete threads[tid];
+    threads[tid] = nullptr;
+    available_ids.push(tid);
+    
+    int next_tid = ready_queue.front();
+    ready_queue.pop_front();
+    
+    running_thread_id = next_tid;
+    threads[next_tid]->state = RUNNING;
+    
+    total_quantums++;
+    threads[next_tid]->quantums_run++;
+    
+    siglongjmp(threads[next_tid]->env, 1);
+}
+int ThreadManager::block_thread(int tid) {
+    if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
+        return -1;
+    }
+    if (tid == 0) {
+        std::cerr << "thread library error: cannot block main thread" << std::endl;
+        return -1;
+    }
+    if (threads[tid]->state == BLOCKED) {
+        return 0; 
+    }
+    //if a thread blocks itself, it need to clear the CPU and swictch to next thread in queue
+    if (tid == running_thread_id) {
+        threads[tid]->state = BLOCKED;
+        context_switch(); 
+    } else {
+        
+        threads[tid]->state = BLOCKED;
+        ready_queue.remove(tid);
+    }
+    
+    return 0;    
+}
+int ThreadManager::resume_thread(int tid) {
+    if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
+        return -1;
+    }
+    
+    if (threads[tid]->state == BLOCKED) {
+        threads[tid]->state = READY;
+        ready_queue.push_back(tid);
+    }
+    
+    return 0;
 }

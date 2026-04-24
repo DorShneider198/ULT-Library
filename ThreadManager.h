@@ -56,6 +56,9 @@ public:
     void context_switch();    
     int get_total_quantums() const;
     int get_thread_quantums(int tid) const;
+    void terminate_current_and_switch();
+    int block_thread(int tid);
+    int resume_thread(int tid);
 };
 
 #endif // THREAD_MANAGER_H

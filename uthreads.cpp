@@ -69,9 +69,10 @@ int uthread_terminate(int tid){
         delete manager; 
         exit(0);
     }
-    // בדיקה אם התהליכון מנסה להרוג את עצמו (נממש scheduling בהמשך)
+    //case where a thread tries to terminate itself
     if (tid == manager->get_running_thread_id()) {
-        // כאן נצטרך לקרוא למתזמן (לשיעור הבא)
+        manager->terminate_current_and_switch();
+        return 0;
     }
     return manager->terminate_thread(tid);
 }
@@ -87,8 +88,11 @@ int uthread_terminate(int tid){
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_block(int tid) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }    
+    return manager->block_thread(tid);
 }
 
 
@@ -102,9 +106,11 @@ int uthread_block(int tid) {
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_resume(int tid) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
-}
+    if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }
+    return manager->resume_thread(tid);}
 
 
 /**
