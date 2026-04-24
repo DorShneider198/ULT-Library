@@ -53,7 +53,9 @@ public:
     int get_running_thread_id() const;
     int spawn_thread(thread_entry_point entry_point);
     int terminate_thread(int tid);
-    
+    void context_switch();    
+    int get_total_quantums() const;
+    int get_thread_quantums(int tid) const;
 };
 
 #endif // THREAD_MANAGER_H

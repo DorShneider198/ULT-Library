@@ -123,7 +123,27 @@ int uthread_resume(int tid) {
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_sleep(int num_quantums) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
+if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }
+    
+    if (num_quantums < 0) {
+        std::cerr << "thread library error: num_quantums must be non-negative" << std::endl;
+        return -1;
+    }
+
+    if (manager->get_running_thread_id() == 0 && num_quantums != 0) {
+        std::cerr << "thread library error: main thread cannot sleep" << std::endl;
+        return -1;
+    }
+
+    if (num_quantums == 0) {
+        manager->context_switch();
+        return 0;
+    }
+
+    std::cerr << "thread library error: did not implement sleep for >0" << std::endl;
     return -1;
 }
 
@@ -150,8 +170,11 @@ int uthread_get_tid() {
  * @return The total number of quantums.
 */
 int uthread_get_total_quantums() {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }
+    return manager->get_total_quantums();
 }
 
 
@@ -165,6 +188,9 @@ int uthread_get_total_quantums() {
  * @return On success, return the number of quantums of the thread with ID tid. On failure, return -1.
 */
 int uthread_get_quantums(int tid) {
-    std::cerr << "thread library error: " << "did not implement" << std::endl;
-    return -1;
+    if (manager == nullptr) {
+        std::cerr << "thread library error: Library not initialized" << std::endl;
+        return -1;
+    }
+    return manager->get_thread_quantums(tid);
 }

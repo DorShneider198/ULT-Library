@@ -57,7 +57,17 @@ void ThreadManager::init_main_thread() {
 int ThreadManager::get_running_thread_id() const {
     return running_thread_id;
 }
-
+int ThreadManager::get_total_quantums() const {
+    return total_quantums;
+}
+int ThreadManager::get_thread_quantums(int tid) const {
+    if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
+        return -1;
+    }
+    
+    return threads[tid]->quantums_run;
+}
 
 int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     if (entry_point == nullptr) {
@@ -101,6 +111,7 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
 
 //this function has 2 steps: realease the memory and return the id to the free id heap
 int ThreadManager::terminate_thread(int tid) {
+
     if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
         return -1;
@@ -119,9 +130,34 @@ int ThreadManager::terminate_thread(int tid) {
     delete threads[tid];
     threads[tid] = nullptr;
 
-    //recycyle id bak to vavilavbes
+    //recycyle id back to avilavbes
     available_ids.push(tid);
 
     return 0;
 
+}
+/**
+ * current thread gives up CPU, changes state to READY and goes to end of queue.
+ */
+void ThreadManager::context_switch() {
+    int current_tid = running_thread_id;
+    //save State of currently running thread
+    int ret_val = sigsetjmp(threads[current_tid]->env, 1);
+
+    if (ret_val == 0) {
+
+        threads[current_tid]->state = READY;
+        ready_queue.push_back(current_tid);
+        
+        int next_tid = ready_queue.front();
+        ready_queue.pop_front();
+        
+        running_thread_id = next_tid;
+        threads[next_tid]->state = RUNNING;
+        
+        total_quantums++;
+        threads[next_tid]->quantums_run++;
+        //tell CPU to jump to "snapshot" of the next thread
+        siglongjmp(threads[next_tid]->env, 1);
+    }  
 }
