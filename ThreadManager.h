@@ -41,6 +41,7 @@ private:
     int quantum_usecs; //time of a single quantum
     int total_quantums; //counter for total quntums of the program
     int running_thread_id;
+    int thread_to_terminate;
     void update_sleeping_threads();
     void pick_next_thread();
 

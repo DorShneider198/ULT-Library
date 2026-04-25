@@ -16,6 +16,7 @@ void block_timer() {
         exit(1);
     }
 }
+
 /**
  *  unblock the signals inside timer_set, if a timer has finished while being blocked, the signal will
     be passed to the thread right after reading this function

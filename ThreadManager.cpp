@@ -14,9 +14,8 @@ address_t translate_address(address_t addr)
 }
 
 ThreadManager::ThreadManager(int quantum_usecs) 
-    : quantum_usecs(quantum_usecs), total_quantums(0), running_thread_id(-1) 
-{
-    
+    : quantum_usecs(quantum_usecs), total_quantums(0), running_thread_id(-1), thread_to_terminate(-1) 
+{    
     for (int i = 0; i < MAX_THREAD_NUM; ++i) {
         threads[i] = nullptr;
     }
@@ -43,7 +42,14 @@ ThreadManager::~ThreadManager() {
 //init main theread
 void ThreadManager::init_main_thread() {
 
-    TCB* main_thread = new TCB();
+    TCB* main_thread = nullptr;
+    try {
+        main_thread = new TCB();
+        main_thread->stack = new char[STACK_SIZE];
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "system error: memory allocation failed\n";
+        exit(1);
+    }
     main_thread->id = 0;
     main_thread->state = RUNNING;
     main_thread->quantums_run = 1;
@@ -84,7 +90,15 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     int new_id = available_ids.top();
     available_ids.pop();
     //allocate thread struct fields.
-    TCB* new_thread = new TCB();
+    TCB* new_thread = nullptr;
+    try {
+
+        new_thread = new TCB();
+        new_thread->stack = new char[STACK_SIZE];
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "system error: memory allocation failed\n";
+        exit(1);
+    }
     new_thread->id = new_id;
     new_thread->state = READY;
     new_thread->quantums_run = 0;
@@ -165,17 +179,29 @@ void ThreadManager::context_switch() {
         //tell CPU to jump to "snapshot" of the next thread, overriding currnt signal mask as well
         siglongjmp(threads[next_tid]->env, 1);
     }  
+    /* terminate the thread from which we jumped*/
+    if (thread_to_terminate != -1) {
+        int tid_to_delete = thread_to_terminate;
+        
+        if (threads[tid_to_delete]->stack != nullptr) {
+            delete[] threads[tid_to_delete]->stack;
+        }
+        delete threads[tid_to_delete];
+        threads[tid_to_delete] = nullptr;
+        
+        available_ids.push(tid_to_delete);
+        
+        thread_to_terminate = -1;
+    }
 }
-
+/**
+ * Handle self termination of a thread
+ */
 void ThreadManager::terminate_current_and_switch() {
     int tid = running_thread_id;
     
-    if (threads[tid]->stack != nullptr) {
-        delete[] threads[tid]->stack;
-    }
-    delete threads[tid];
-    threads[tid] = nullptr;
-    available_ids.push(tid);
+    thread_to_terminate = tid;
+    
     update_sleeping_threads();
     int next_tid = ready_queue.front();
     ready_queue.pop_front();
