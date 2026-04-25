@@ -48,6 +48,7 @@ void ThreadManager::init_main_thread() {
     main_thread->state = RUNNING;
     main_thread->quantums_run = 1;
     main_thread->sleep_quantums_left = 0;
+    main_thread->is_blocked = false;
     //no need to allocated stack for main thread in ex instructions
     main_thread->stack = nullptr; 
     threads[0] = main_thread;
@@ -88,6 +89,7 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     new_thread->state = READY;
     new_thread->quantums_run = 0;
     new_thread->sleep_quantums_left = 0;
+    new_thread->is_blocked = false;
     new_thread->stack = new char[STACK_SIZE];
 
     //setup Context:
@@ -149,7 +151,21 @@ void ThreadManager::context_switch() {
         if (threads[current_tid]->state == RUNNING) {
             threads[current_tid]->state = READY;
             ready_queue.push_back(current_tid);
-        }        
+        } 
+        //iterate all other threads and -- their sleep_left since context switching "starting a new run on CPU"
+        for (int i = 1; i < MAX_THREAD_NUM; ++i) { 
+            if (threads[i] != nullptr && threads[i]->sleep_quantums_left > 0) {
+                
+                threads[i]->sleep_quantums_left--;
+                //if a thread done sleeping push it back to ready queue
+                //if done sleeping AND no other thread is blocking it 
+                if (threads[i]->sleep_quantums_left == 0 && !threads[i]->is_blocked) {
+                    threads[i]->state = READY;
+                    ready_queue.push_back(i);
+                }
+            }
+        }
+        
         int next_tid = ready_queue.front();
         ready_queue.pop_front();
         
@@ -192,31 +208,41 @@ int ThreadManager::block_thread(int tid) {
         std::cerr << "thread library error: cannot block main thread" << std::endl;
         return -1;
     }
-    if (threads[tid]->state == BLOCKED) {
-        return 0; 
-    }
-    //if a thread blocks itself, it need to clear the CPU and swictch to next thread in queue
-    if (tid == running_thread_id) {
+
+    threads[tid]->is_blocked = true;
+
+    if (threads[tid]->state != BLOCKED) {
         threads[tid]->state = BLOCKED;
-        context_switch(); 
-    } else {
-        
-        threads[tid]->state = BLOCKED;
-        ready_queue.remove(tid);
+        //if a thread blocks itself, it need to clear the CPU and switch to next thread in queue
+        if (tid == running_thread_id) {
+            context_switch(); 
+        } else {
+            ready_queue.remove(tid);
+        }
     }
     
-    return 0;    
+    return 0;
 }
+
 int ThreadManager::resume_thread(int tid) {
     if (tid < 0 || tid >= MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << "thread library error: thread " << tid << " does not exist" << std::endl;
         return -1;
     }
     
-    if (threads[tid]->state == BLOCKED) {
+    threads[tid]->is_blocked = false;
+    
+    if (threads[tid]->state == BLOCKED && threads[tid]->sleep_quantums_left == 0) {
         threads[tid]->state = READY;
         ready_queue.push_back(tid);
     }
     
     return 0;
+}
+void ThreadManager::sleep_current_thread(int quantums) {
+    int tid = running_thread_id;
+    threads[tid]->sleep_quantums_left = quantums + 1;
+    threads[tid]->state = BLOCKED;
+    
+    context_switch();
 }

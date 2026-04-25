@@ -148,9 +148,9 @@ if (manager == nullptr) {
         manager->context_switch();
         return 0;
     }
-
-    std::cerr << "thread library error: did not implement sleep for >0" << std::endl;
-    return -1;
+    //handle quantum > 0
+    manager->sleep_current_thread(num_quantums);
+        return 0;
 }
 
 

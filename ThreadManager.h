@@ -20,6 +20,7 @@ struct TCB {
     ThreadState state;
     int quantums_run;  //how many times thread was selected by scheduler 
     int sleep_quantums_left; 
+    bool is_blocked;
     char* stack;   
     //env is a field to store CPU registers status such as PC,SP
     sigjmp_buf env;
@@ -59,6 +60,7 @@ public:
     void terminate_current_and_switch();
     int block_thread(int tid);
     int resume_thread(int tid);
+    void sleep_current_thread(int quantums);
 };
 
 #endif // THREAD_MANAGER_H
