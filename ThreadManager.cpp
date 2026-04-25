@@ -152,20 +152,7 @@ void ThreadManager::context_switch() {
             threads[current_tid]->state = READY;
             ready_queue.push_back(current_tid);
         } 
-        //iterate all other threads and -- their sleep_left since context switching "starting a new run on CPU"
-        for (int i = 1; i < MAX_THREAD_NUM; ++i) { 
-            if (threads[i] != nullptr && threads[i]->sleep_quantums_left > 0) {
-                
-                threads[i]->sleep_quantums_left--;
-                //if a thread done sleeping push it back to ready queue
-                //if done sleeping AND no other thread is blocking it 
-                if (threads[i]->sleep_quantums_left == 0 && !threads[i]->is_blocked) {
-                    threads[i]->state = READY;
-                    ready_queue.push_back(i);
-                }
-            }
-        }
-        
+        update_sleeping_threads();
         int next_tid = ready_queue.front();
         ready_queue.pop_front();
         
@@ -187,7 +174,7 @@ void ThreadManager::terminate_current_and_switch() {
     delete threads[tid];
     threads[tid] = nullptr;
     available_ids.push(tid);
-    
+    update_sleeping_threads();
     int next_tid = ready_queue.front();
     ready_queue.pop_front();
     
@@ -245,4 +232,18 @@ void ThreadManager::sleep_current_thread(int quantums) {
     threads[tid]->state = BLOCKED;
     
     context_switch();
+}
+
+void ThreadManager::update_sleeping_threads() {
+    //iterate all other threads and -- their sleep_left since context switching "starting a new run on CPU"
+    for (int i = 1; i < MAX_THREAD_NUM; ++i) { 
+        if (threads[i] != nullptr && threads[i]->sleep_quantums_left > 0) {
+            threads[i]->sleep_quantums_left--;
+                //if done sleeping AND no other thread is blocking it 
+            if (threads[i]->sleep_quantums_left == 0 && !threads[i]->is_blocked) {
+                threads[i]->state = READY;
+                ready_queue.push_back(i);
+            }
+        }
+    }
 }

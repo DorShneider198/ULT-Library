@@ -1,9 +1,29 @@
 #include "uthreads.h"
 #include "ThreadManager.h"
 #include <iostream>
+#include <sys/time.h>
+#include <signal.h>
 //creating a single manager object
 static ThreadManager* manager = nullptr;
-
+static sigset_t timer_set;
+void block_timer() {
+    if (sigprocmask(SIG_BLOCK, &timer_set, NULL) < 0) {
+        std::cerr << "system error: sigprocmask block failed\n";
+        exit(1);
+    }
+}
+void unblock_timer() {
+    if (sigprocmask(SIG_UNBLOCK, &timer_set, NULL) < 0) {
+        std::cerr << "system error: sigprocmask unblock failed\n";
+        exit(1);
+    }
+}
+//helper to handle switch each time a signal is received.
+void timer_handler(int sig) {
+    if (manager != nullptr) {
+        manager->context_switch();
+    }
+}
 /**
  * @brief initializes the thread library.
  *
@@ -21,13 +41,35 @@ int uthread_init(int quantum_usecs) {
         std::cerr << "thread library error: " << "Illegal quantum length" << std::endl;
         return -1;
     }
-    // Check if it was already initialized
+    
     if (manager != nullptr) {
         std::cerr << "thread library error: Library already initialized" << std::endl;
         return -1;
     }
     manager = new ThreadManager(quantum_usecs);
     manager->init_main_thread();
+    if (sigemptyset(&timer_set) < 0 || sigaddset(&timer_set, SIGVTALRM) < 0) {
+            std::cerr << "system error: sigset setup failed\n";
+            exit(1);
+        }
+    struct sigaction sa = {0};
+    sa.sa_handler = &timer_handler;
+    //when a thread gets the syscall SIGVTALRM it halts and go to run timer_handler
+    if (sigaction(SIGVTALRM, &sa, NULL) < 0) {
+        std::cerr << "system error: sigaction error\n";
+        exit(1);
+    }
+
+    struct itimerval timer;
+    timer.it_value.tv_sec = quantum_usecs / 1000000;
+    timer.it_value.tv_usec = quantum_usecs % 1000000;
+    timer.it_interval.tv_sec = quantum_usecs / 1000000;
+    timer.it_interval.tv_usec = quantum_usecs % 1000000;
+
+    if (setitimer(ITIMER_VIRTUAL, &timer, NULL) < 0) {
+        std::cerr << "system error: setitimer error\n";
+        exit(1);
+    }
     return 0;
 }
 
@@ -44,11 +86,16 @@ int uthread_init(int quantum_usecs) {
  * @return On success, return the ID of the created thread. On failure, return -1.
 */
 int uthread_spawn(thread_entry_point entry_point) {
+    block_timer();
     if (manager == nullptr) {
             std::cerr << "thread library error: Library not initialized" << std::endl;
+            unblock_timer();
             return -1;
     }
-    return manager->spawn_thread(entry_point);
+    int res = manager->spawn_thread(entry_point);
+    
+    unblock_timer();
+    return res;
 }
 
 
@@ -64,7 +111,11 @@ int uthread_spawn(thread_entry_point entry_point) {
  * itself or the main thread is terminated, the function does not return.
 */
 int uthread_terminate(int tid){
-    if (manager == nullptr) return -1;
+    block_timer();
+    if (manager == nullptr) {
+        unblock_timer();
+        return -1;
+    }    
     if (tid == 0) {
         delete manager; 
         exit(0);
@@ -74,7 +125,10 @@ int uthread_terminate(int tid){
         manager->terminate_current_and_switch();
         return 0;
     }
-    return manager->terminate_thread(tid);
+    int res = manager->terminate_thread(tid);
+    
+    unblock_timer();
+    return res;
 }
 
 
@@ -88,11 +142,18 @@ int uthread_terminate(int tid){
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_block(int tid) {
+    block_timer();
+    
     if (manager == nullptr) {
-        std::cerr << "thread library error: Library not initialized" << std::endl;
+        std::cerr << "thread library error: Library not initialized\n";
+        unblock_timer();
         return -1;
-    }    
-    return manager->block_thread(tid);
+    }
+    
+    int res = manager->block_thread(tid);
+    
+    unblock_timer();
+    return res;
 }
 
 
@@ -106,12 +167,19 @@ int uthread_block(int tid) {
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_resume(int tid) {
+    block_timer();
+    
     if (manager == nullptr) {
-        std::cerr << "thread library error: Library not initialized" << std::endl;
+        std::cerr << "thread library error: Library not initialized\n";
+        unblock_timer();
         return -1;
     }
-    return manager->resume_thread(tid);}
-
+    
+    int res = manager->resume_thread(tid);
+    
+    unblock_timer();
+    return res;
+}
 
 /**
  * @brief Blocks the RUNNING thread for num_quantums quantums.
@@ -129,30 +197,34 @@ int uthread_resume(int tid) {
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_sleep(int num_quantums) {
-if (manager == nullptr) {
+    block_timer();
+    if (manager == nullptr) {
         std::cerr << "thread library error: Library not initialized" << std::endl;
+        unblock_timer();
         return -1;
     }
     
     if (num_quantums < 0) {
         std::cerr << "thread library error: num_quantums must be non-negative" << std::endl;
+        unblock_timer();
         return -1;
     }
 
     if (manager->get_running_thread_id() == 0 && num_quantums != 0) {
         std::cerr << "thread library error: main thread cannot sleep" << std::endl;
+        unblock_timer();
         return -1;
     }
 
-    if (num_quantums == 0) {
+if (num_quantums == 0) {
         manager->context_switch();
-        return 0;
+    } else { //quntum >0
+        manager->sleep_current_thread(num_quantums);
     }
-    //handle quantum > 0
-    manager->sleep_current_thread(num_quantums);
-        return 0;
+    
+    unblock_timer();
+    return 0;
 }
-
 
 /**
  * @brief Returns the thread ID of the calling thread.
