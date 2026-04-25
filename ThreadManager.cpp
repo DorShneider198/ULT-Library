@@ -97,7 +97,8 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     address_t sp = (address_t)new_thread->stack + STACK_SIZE - sizeof(address_t);
     //entry_point is the value of the Program Counter from which the created thread begins its code?
     address_t pc = (address_t)entry_point;
-    //create a "snapshot" of CPU registers and store it in env
+    /*create a "snapshot" of CPU registers and store it in env, 1 is to save into env
+    the current signal mask of the thread*/
     sigsetjmp(new_thread->env, 1);
     //override garbage values with the actual thread's relevant data.
     (new_thread->env->__jmpbuf)[JB_SP] = translate_address(sp);
@@ -161,10 +162,11 @@ void ThreadManager::context_switch() {
         
         total_quantums++;
         threads[next_tid]->quantums_run++;
-        //tell CPU to jump to "snapshot" of the next thread
+        //tell CPU to jump to "snapshot" of the next thread, overriding currnt signal mask as well
         siglongjmp(threads[next_tid]->env, 1);
     }  
 }
+
 void ThreadManager::terminate_current_and_switch() {
     int tid = running_thread_id;
     

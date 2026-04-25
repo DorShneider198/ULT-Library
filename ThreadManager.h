@@ -49,7 +49,7 @@ public:
     ThreadManager(int quantum_usecs);
     //since every array cell is a pointer, we need a to free each of the cells memory as well
     ~ThreadManager();
-    //RAII, make sure copy constructor and assignment are not allowed, we want a single copy of ThreadManger
+    //RAII, make sure copy ctr and assignment are not allowed, we want a single copy of ThreadManger
     ThreadManager(const ThreadManager&) = delete;
     ThreadManager& operator=(const ThreadManager&) = delete;
     void init_main_thread();
