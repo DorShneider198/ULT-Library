@@ -1,5 +1,7 @@
 #include "ThreadManager.h"
 #include <iostream>
+#include <sys/time.h>
+
 typedef unsigned long address_t;
 #define JB_SP 6
 #define JB_PC 7
@@ -45,7 +47,6 @@ void ThreadManager::init_main_thread() {
     TCB* main_thread = nullptr;
     try {
         main_thread = new TCB();
-        main_thread->stack = new char[STACK_SIZE];
     } catch (const std::bad_alloc& e) {
         std::cerr << "system error: memory allocation failed\n";
         exit(1);
@@ -104,7 +105,6 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     new_thread->quantums_run = 0;
     new_thread->sleep_quantums_left = 0;
     new_thread->is_blocked = false;
-    new_thread->stack = new char[STACK_SIZE];
 
     //setup Context:
     //note to myself: address_t is just a convinient type to work with memory
@@ -157,6 +157,18 @@ int ThreadManager::terminate_thread(int tid) {
  * current thread gives up CPU, changes state to READY and goes to end of queue.
  */
 void ThreadManager::context_switch() {
+        /* terminate the thread from which we jumped*/
+
+    if (thread_to_terminate != -1 && thread_to_terminate != running_thread_id) {
+        int tid_to_delete = thread_to_terminate;
+        if (threads[tid_to_delete]->stack != nullptr) {
+            delete[] threads[tid_to_delete]->stack;
+        }
+        delete threads[tid_to_delete];
+        threads[tid_to_delete] = nullptr;
+        available_ids.push(tid_to_delete);
+        thread_to_terminate = -1;
+    }
     int current_tid = running_thread_id;
     //save State of currently running thread
     int ret_val = sigsetjmp(threads[current_tid]->env, 1);
@@ -176,28 +188,30 @@ void ThreadManager::context_switch() {
         
         total_quantums++;
         threads[next_tid]->quantums_run++;
+        struct itimerval timer;
+        timer.it_value.tv_sec = quantum_usecs / 1000000;
+        timer.it_value.tv_usec = quantum_usecs % 1000000;
+        timer.it_interval.tv_sec = quantum_usecs / 1000000;
+        timer.it_interval.tv_usec = quantum_usecs % 1000000;
+        setitimer(ITIMER_VIRTUAL, &timer, NULL);
         //tell CPU to jump to "snapshot" of the next thread, overriding currnt signal mask as well
         siglongjmp(threads[next_tid]->env, 1);
     }  
-    /* terminate the thread from which we jumped*/
-    if (thread_to_terminate != -1) {
-        int tid_to_delete = thread_to_terminate;
-        
-        if (threads[tid_to_delete]->stack != nullptr) {
-            delete[] threads[tid_to_delete]->stack;
-        }
-        delete threads[tid_to_delete];
-        threads[tid_to_delete] = nullptr;
-        
-        available_ids.push(tid_to_delete);
-        
-        thread_to_terminate = -1;
-    }
 }
 /**
  * Handle self termination of a thread
  */
 void ThreadManager::terminate_current_and_switch() {
+    if (thread_to_terminate != -1 && thread_to_terminate != running_thread_id) {
+        int tid_to_delete = thread_to_terminate;
+        if (threads[tid_to_delete]->stack != nullptr) {
+            delete[] threads[tid_to_delete]->stack;
+        }
+        delete threads[tid_to_delete];
+        threads[tid_to_delete] = nullptr;
+        available_ids.push(tid_to_delete);
+        thread_to_terminate = -1;
+    }
     int tid = running_thread_id;
     
     thread_to_terminate = tid;
@@ -211,7 +225,12 @@ void ThreadManager::terminate_current_and_switch() {
     
     total_quantums++;
     threads[next_tid]->quantums_run++;
-    
+    struct itimerval timer;
+    timer.it_value.tv_sec = quantum_usecs / 1000000;
+    timer.it_value.tv_usec = quantum_usecs % 1000000;
+    timer.it_interval.tv_sec = quantum_usecs / 1000000;
+    timer.it_interval.tv_usec = quantum_usecs % 1000000;
+    setitimer(ITIMER_VIRTUAL, &timer, NULL);
     siglongjmp(threads[next_tid]->env, 1);
 }
 int ThreadManager::block_thread(int tid) {
