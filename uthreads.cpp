@@ -27,7 +27,9 @@ void unblock_timer() {
         exit(1);
     }
 }
-
+/**
+ * all this function does is activate context_switch
+ */
 void timer_handler(int sig) {
     if (manager != nullptr) {
         manager->context_switch();
@@ -57,7 +59,13 @@ int uthread_init(int quantum_usecs) {
         std::cerr << "thread library error: Library already initialized" << std::endl;
         return -1;
     }
-    manager = new ThreadManager(quantum_usecs);
+    try {
+        manager = new ThreadManager(quantum_usecs);
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "system error: memory allocation failed\n";
+        exit(1);
+    }
+
     manager->init_main_thread();
     /* clean timer_set from garbage values and put the SIGVTALRM inside the set (so block_timer will know
     which signal to block, the SIGVTALRM */
@@ -141,7 +149,7 @@ int uthread_terminate(int tid){
     //case where a thread tries to terminate itself
     if (tid == manager->get_running_thread_id()) {
         manager->terminate_current_and_switch();
-        return 0;
+        return 0;//unreachable the previous func will jump
     }
     int res = manager->terminate_thread(tid);
     
@@ -242,7 +250,7 @@ int uthread_sleep(int num_quantums) {
         return -1;
     }
 
-if (num_quantums == 0) {
+    if (num_quantums == 0) {
         manager->context_switch();
     } else { //quntum >0
         manager->sleep_current_thread(num_quantums);

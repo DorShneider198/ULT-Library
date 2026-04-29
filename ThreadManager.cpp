@@ -14,7 +14,10 @@ address_t translate_address(address_t addr)
                  : "0" (addr));
     return ret;
 }
-
+/**
+ * Initializing a ThreadManager object, which is in fact an array in MAX_THREAD_NUM length
+ * each cell is a pointer to a thread object/
+ */
 ThreadManager::ThreadManager(int quantum_usecs) 
     : quantum_usecs(quantum_usecs), total_quantums(0), running_thread_id(-1), thread_to_terminate(-1) 
 {    
@@ -56,7 +59,8 @@ void ThreadManager::init_main_thread() {
     main_thread->quantums_run = 1;
     main_thread->sleep_quantums_left = 0;
     main_thread->is_blocked = false;
-    //no need to allocated stack for main thread in ex instructions
+    /*stack is not needed for main thread, it already runs on main() stack!
+    */
     main_thread->stack = nullptr; 
     threads[0] = main_thread;
     running_thread_id = 0;
@@ -102,7 +106,7 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     }
     new_thread->id = new_id;
     new_thread->state = READY;
-    new_thread->quantums_run = 0;
+    new_thread->quantums_run = 0; //only created, not running yet
     new_thread->sleep_quantums_left = 0;
     new_thread->is_blocked = false;
 
@@ -120,7 +124,7 @@ int ThreadManager::spawn_thread(thread_entry_point entry_point) {
     
     //reset state of signals
     sigemptyset(&new_thread->env->__saved_mask);
-
+    
     threads[new_id] = new_thread;
     ready_queue.push_back(new_id);
     return new_id;
@@ -137,6 +141,11 @@ int ThreadManager::terminate_thread(int tid) {
     if(tid == 0) {
         return 0;
     }
+
+    if (tid == thread_to_terminate) {
+        thread_to_terminate = -1;
+    }
+
     //removing thread from the running ready queue
     ready_queue.remove(tid);
     //free memory
@@ -157,7 +166,7 @@ int ThreadManager::terminate_thread(int tid) {
  * current thread gives up CPU, changes state to READY and goes to end of queue.
  */
 void ThreadManager::context_switch() {
-        /* terminate the thread from which we jumped*/
+    /* terminate the thread from which we jumped*/
 
     if (thread_to_terminate != -1 && thread_to_terminate != running_thread_id) {
         int tid_to_delete = thread_to_terminate;
@@ -188,6 +197,7 @@ void ThreadManager::context_switch() {
         
         total_quantums++;
         threads[next_tid]->quantums_run++;
+        //resetting the timer to a full new quantum for the thread we switichin to
         struct itimerval timer;
         timer.it_value.tv_sec = quantum_usecs / 1000000;
         timer.it_value.tv_usec = quantum_usecs % 1000000;

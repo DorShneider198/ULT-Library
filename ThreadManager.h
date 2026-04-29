@@ -18,9 +18,10 @@ enum ThreadState {
 struct TCB {
     int id;
     ThreadState state;
-    int quantums_run;  //how many times thread was selected by scheduler 
+    //how many times thread was selected by scheduler,increasing in each context switich to this thread
+    int quantums_run;  
     int sleep_quantums_left; 
-    bool is_blocked;
+    bool is_blocked; //is called on by uthread_block
     char* stack;   
     //env is a field to store CPU registers status such as PC,SP
     sigjmp_buf env;
@@ -38,12 +39,15 @@ private:
     // min heap to find next available id(which is the smallest)
     std::priority_queue<int, std::vector<int>, std::greater<int>> available_ids;
 
-    int quantum_usecs; //time of a single quantum
+    int quantum_usecs; //time of a single quantum, how long each thread gets the CPU for
     int total_quantums; //counter for total quntums of the program
     int running_thread_id;
+    /**
+     * when thread self terminates, it cannot free its own stack
+     * so we mark the id of a self terminating thread to delete later
+     */
     int thread_to_terminate;
     void update_sleeping_threads();
-    void pick_next_thread();
 
 public:
     
