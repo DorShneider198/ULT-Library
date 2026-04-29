@@ -7,6 +7,7 @@
 static ThreadManager* manager = nullptr;
 // a strcture to hold signals
 static sigset_t timer_set;
+//block_timer and unblock_timer define a "Critical Section" in which the thread cannot be interrutped
 /**
  * take signals stored in timer_set and block them until further notice
  */
